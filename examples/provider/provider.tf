@@ -1,0 +1,3 @@
+# Default authentication
+provider "msgraph" {
+}
