@@ -14,6 +14,7 @@ on:
 # Testing only needs permissions to read the repository contents.
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   # Ensure project builds before running testing matrix
