@@ -24,3 +24,10 @@ provider "msgraph" {
 ### Optional
 
 - `api_version` (String) The Microsoft Graph API version to use, default is v1.0.
+- `client_id` (String) The Client ID which should be used.
+- `oidc_request_token` (String) The bearer token for the request to the OIDC provider. For use When authenticating as a Service Principal using OpenID Connect.
+- `oidc_request_url` (String) The URL for the OIDC provider from which to request an ID token. For use When authenticating as a Service Principal using OpenID Connect.
+- `oidc_token` (String) The OIDC ID token for use when authenticating as a Service Principal using OpenID Connect.
+- `oidc_token_file_path` (String) The path to a file containing an OIDC ID token for use when authenticating as a Service Principal using OpenID Connect.
+- `tenant_id` (String) The Tenant ID which should be used.
+- `use_oidc` (Boolean) Allow OpenID Connect to be used for authentication
