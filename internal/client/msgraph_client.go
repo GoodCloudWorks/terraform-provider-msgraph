@@ -24,7 +24,9 @@ type MsGraphClientOptions struct {
 }
 
 type MsGraphClient struct {
-	resty *resty.Client
+	Options    *MsGraphClientOptions
+	credential *azidentity.ChainedTokenCredential
+	resty      *resty.Client
 }
 
 func NewMsGraphClient(options *MsGraphClientOptions) (*MsGraphClient, error) {
@@ -45,7 +47,22 @@ func NewMsGraphClient(options *MsGraphClientOptions) (*MsGraphClient, error) {
 		req.SetAuthScheme("Bearer").SetAuthToken(token.Token)
 		return nil
 	})
-	return &MsGraphClient{resty: client}, nil
+	msGraphClient := &MsGraphClient{
+		Options:    options,
+		credential: credential,
+		resty:      client,
+	}
+	return msGraphClient, nil
+}
+
+func (client *MsGraphClient) GetAccessToken(context context.Context) (string, error) {
+	token, err := client.credential.GetToken(context, policy.TokenRequestOptions{
+		Scopes: []string{"https://graph.microsoft.com/.default"},
+	})
+	if err != nil {
+		return "", err
+	}
+	return token.Token, nil
 }
 
 func (client *MsGraphClient) Get(context context.Context, path string) (*interface{}, error) {

@@ -44,7 +44,7 @@ func (r *MsGraphObjectDataSource) Schema(ctx context.Context, request datasource
 	response.Schema = schema.Schema{
 		Description: "This data source provides access to Microsoft Graph objects.",
 		Attributes: map[string]schema.Attribute{
-			`id`: schema.StringAttribute{
+			"id": schema.StringAttribute{
 				Required:    true,
 				Description: "The ID of the object to retrieve.",
 			},

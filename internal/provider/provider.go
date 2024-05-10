@@ -197,6 +197,7 @@ func (p *MsGraphProvider) Resources(ctx context.Context) []func() resource.Resou
 
 func (p *MsGraphProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		NewMsGraphProviderConfigDataSource,
 		NewMsGraphObjectDataSource,
 	}
 }
