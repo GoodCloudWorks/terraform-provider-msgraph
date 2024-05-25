@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"terraform-provider-msgraph/internal/client/credentials"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -99,16 +101,7 @@ func newTokenCredential(options *MsGraphClientOptions) (*azidentity.ChainedToken
 	}
 
 	if options.UseOIDC {
-		oidcOptions := &oidcCredentialOptions{
-			ClientID: options.ClientID,
-			TenantID: options.TenantID,
-
-			RequestToken:  options.OIDCRequestToken,
-			RequestUrl:    options.OIDCRequestURL,
-			Token:         options.OIDCToken,
-			TokenFilePath: options.OIDCTokenFilePath,
-		}
-		oidcCredential, err := newOidcCredential(oidcOptions)
+		oidcCredential, err := newOidcCredential(options)
 		if err != nil {
 			return nil, err
 		}
@@ -127,4 +120,21 @@ func newTokenCredential(options *MsGraphClientOptions) (*azidentity.ChainedToken
 	}
 
 	return chainedCredentials, nil
+}
+
+func newOidcCredential(options *MsGraphClientOptions) (azcore.TokenCredential, error) {
+	oidcOptions := &credentials.OidcCredentialOptions{
+		ClientID: options.ClientID,
+		TenantID: options.TenantID,
+
+		RequestToken:  options.OIDCRequestToken,
+		RequestUrl:    options.OIDCRequestURL,
+		Token:         options.OIDCToken,
+		TokenFilePath: options.OIDCTokenFilePath,
+	}
+	credential, err := credentials.NewOidcCredential(oidcOptions)
+	if err != nil {
+		return nil, err
+	}
+	return credential, nil
 }

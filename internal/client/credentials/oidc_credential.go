@@ -1,4 +1,4 @@
-package client
+package credentials
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
-type oidcCredential struct {
+type OidcCredential struct {
 	requestToken  string
 	requestUrl    string
 	token         string
@@ -23,7 +23,7 @@ type oidcCredential struct {
 	cred          *azidentity.ClientAssertionCredential
 }
 
-type oidcCredentialOptions struct {
+type OidcCredentialOptions struct {
 	azcore.ClientOptions
 	TenantID                   string
 	ClientID                   string
@@ -34,10 +34,10 @@ type oidcCredentialOptions struct {
 	AdditionallyAllowedTenants []string
 }
 
-var _ azcore.TokenCredential = &oidcCredential{}
+var _ azcore.TokenCredential = &OidcCredential{}
 
-func newOidcCredential(options *oidcCredentialOptions) (*oidcCredential, error) {
-	w := &oidcCredential{
+func NewOidcCredential(options *OidcCredentialOptions) (*OidcCredential, error) {
+	w := &OidcCredential{
 		requestToken:  options.RequestToken,
 		requestUrl:    options.RequestUrl,
 		token:         options.Token,
@@ -57,11 +57,11 @@ func newOidcCredential(options *oidcCredentialOptions) (*oidcCredential, error) 
 	return w, nil
 }
 
-func (w *oidcCredential) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+func (w *OidcCredential) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
 	return w.cred.GetToken(ctx, opts)
 }
 
-func (w *oidcCredential) getAssertion(ctx context.Context) (string, error) {
+func (w *OidcCredential) getAssertion(ctx context.Context) (string, error) {
 	if w.token != "" {
 		return w.token, nil
 	}
