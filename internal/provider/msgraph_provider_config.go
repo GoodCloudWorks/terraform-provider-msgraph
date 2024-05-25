@@ -94,8 +94,8 @@ func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request data
 	model.TenantID = types.StringValue(tid)
 	model.ObjectID = types.StringValue(oid)
 
-	if client.Options.ClientID != "" {
-		model.ClientID = types.StringValue(client.Options.ClientID)
+	if client.Options.Credentials.ClientID != "" {
+		model.ClientID = types.StringValue(client.Options.Credentials.ClientID)
 	}
 
 	response.Diagnostics.Append(response.State.Set(ctx, &model)...)

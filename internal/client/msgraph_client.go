@@ -9,30 +9,22 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/go-resty/resty/v2"
 )
 
 type MsGraphClientOptions struct {
-	ApiVersion string
-	TenantID   string
-	ClientID   string
-
-	UseOIDC           bool
-	OIDCRequestToken  string
-	OIDCRequestURL    string
-	OIDCToken         string
-	OIDCTokenFilePath string
+	ApiVersion  string
+	Credentials *credentials.CredentialOptions
 }
 
 type MsGraphClient struct {
 	Options    *MsGraphClientOptions
-	credential *azidentity.ChainedTokenCredential
+	credential azcore.TokenCredential
 	resty      *resty.Client
 }
 
 func NewMsGraphClient(options *MsGraphClientOptions) (*MsGraphClient, error) {
-	credential, err := newTokenCredential(options)
+	credential, err := credentials.NewTokenCredential(options.Credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -91,50 +83,4 @@ func (client *MsGraphClient) Get(context context.Context, path string) (*interfa
 		return nil, err
 	}
 	return &result, nil
-}
-
-func newTokenCredential(options *MsGraphClientOptions) (*azidentity.ChainedTokenCredential, error) {
-	var credentials []azcore.TokenCredential
-
-	credentialOptions := &azidentity.DefaultAzureCredentialOptions{
-		TenantID: options.TenantID,
-	}
-
-	if options.UseOIDC {
-		oidcCredential, err := newOidcCredential(options)
-		if err != nil {
-			return nil, err
-		}
-		credentials = append(credentials, oidcCredential)
-	}
-
-	defaultCredential, err := azidentity.NewDefaultAzureCredential(credentialOptions)
-	if err != nil {
-		return nil, err
-	}
-	credentials = append(credentials, defaultCredential)
-
-	chainedCredentials, err := azidentity.NewChainedTokenCredential(credentials, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return chainedCredentials, nil
-}
-
-func newOidcCredential(options *MsGraphClientOptions) (azcore.TokenCredential, error) {
-	oidcOptions := &credentials.OidcCredentialOptions{
-		ClientID: options.ClientID,
-		TenantID: options.TenantID,
-
-		RequestToken:  options.OIDCRequestToken,
-		RequestUrl:    options.OIDCRequestURL,
-		Token:         options.OIDCToken,
-		TokenFilePath: options.OIDCTokenFilePath,
-	}
-	credential, err := credentials.NewOidcCredential(oidcOptions)
-	if err != nil {
-		return nil, err
-	}
-	return credential, nil
 }

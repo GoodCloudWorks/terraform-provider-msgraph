@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"terraform-provider-msgraph/internal/client"
+	"terraform-provider-msgraph/internal/client/credentials"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -99,10 +100,9 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 	readProviderData(&data)
 	writeDefaultAzureCredentialEnvironmentVariables(&data)
 
-	options := &client.MsGraphClientOptions{
-		ApiVersion: data.ApiVersion.ValueString(),
-		TenantID:   data.TenantID.ValueString(),
-		ClientID:   data.ClientID.ValueString(),
+	credentialOptions := &credentials.CredentialOptions{
+		TenantID: data.TenantID.ValueString(),
+		ClientID: data.ClientID.ValueString(),
 
 		UseOIDC:           data.UseOIDC.ValueBool(),
 		OIDCRequestToken:  data.OIDCRequestToken.ValueString(),
@@ -110,6 +110,12 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 		OIDCToken:         data.OIDCToken.ValueString(),
 		OIDCTokenFilePath: data.OIDCTokenFilePath.ValueString(),
 	}
+
+	options := &client.MsGraphClientOptions{
+		ApiVersion:  data.ApiVersion.ValueString(),
+		Credentials: credentialOptions,
+	}
+
 	client, err := client.NewMsGraphClient(options)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to obtain a msgraph client.", err.Error())
@@ -120,75 +126,56 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 	resp.ResourceData = client
 }
 
-func readProviderData(data *MsGraphProviderData) {
-	if data.ApiVersion.IsNull() {
-		if v := os.Getenv("MSGRAPH_API_VERSION"); v != "" {
-			data.ApiVersion = types.StringValue(v)
-		} else {
-			data.ApiVersion = types.StringValue("v1.0")
+func readStringFromEnvironment(data types.String, names ...string) types.String {
+	if data.IsNull() {
+		for _, name := range names {
+			if value := os.Getenv(name); value != "" {
+				return types.StringValue(value)
+			}
 		}
 	}
-
-	if data.ClientID.IsNull() {
-		if v := os.Getenv("ARM_CLIENT_ID"); v != "" {
-			data.ClientID = types.StringValue(v)
-		}
-	}
-
-	if data.TenantID.IsNull() {
-		if v := os.Getenv("ARM_TENANT_ID"); v != "" {
-			data.TenantID = types.StringValue(v)
-		}
-	}
-
-	readOidcOptions(data)
+	return data
 }
 
-func readOidcOptions(data *MsGraphProviderData) {
-	if data.OIDCRequestToken.IsNull() {
-		if v := os.Getenv("ARM_OIDC_REQUEST_TOKEN"); v != "" {
-			data.OIDCRequestToken = types.StringValue(v)
-		} else if v := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN"); v != "" {
-			data.OIDCRequestToken = types.StringValue(v)
+func readBoolFromEnvironment(data types.Bool, names ...string) types.Bool {
+	if data.IsNull() {
+		for _, name := range names {
+			if value := os.Getenv(name); value != "" {
+				return types.BoolValue(value == "true")
+			}
 		}
+		return types.BoolValue(false)
 	}
 
-	if data.OIDCRequestURL.IsNull() {
-		if v := os.Getenv("ARM_OIDC_REQUEST_URL"); v != "" {
-			data.OIDCRequestURL = types.StringValue(v)
-		} else if v := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL"); v != "" {
-			data.OIDCRequestURL = types.StringValue(v)
-		}
+	return data
+}
+
+func readProviderData(data *MsGraphProviderData) {
+	data.ApiVersion = readStringFromEnvironment(data.ApiVersion, "MSGRAPH_API_VERSION")
+	if data.ApiVersion.IsNull() {
+		data.ApiVersion = types.StringValue("v1.0")
 	}
 
-	if data.OIDCToken.IsNull() {
-		if v := os.Getenv("ARM_OIDC_TOKEN"); v != "" {
-			data.OIDCToken = types.StringValue(v)
-		}
-	}
+	data.ClientID = readStringFromEnvironment(data.ClientID, "ARM_CLIENT_ID")
+	data.TenantID = readStringFromEnvironment(data.TenantID, "ARM_TENANT_ID")
 
-	if data.OIDCTokenFilePath.IsNull() {
-		if v := os.Getenv("ARM_OIDC_TOKEN_FILE_PATH"); v != "" {
-			data.OIDCTokenFilePath = types.StringValue(v)
-		}
-	}
+	// OIDC
+	data.OIDCRequestToken = readStringFromEnvironment(data.OIDCRequestToken, "ARM_OIDC_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+	data.OIDCRequestURL = readStringFromEnvironment(data.OIDCRequestURL, "ARM_OIDC_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_URL")
+	data.OIDCToken = readStringFromEnvironment(data.OIDCToken, "ARM_OIDC_TOKEN")
+	data.OIDCTokenFilePath = readStringFromEnvironment(data.OIDCTokenFilePath, "ARM_OIDC_TOKEN_FILE_PATH")
+	data.UseOIDC = readBoolFromEnvironment(data.UseOIDC, "ARM_USE_OIDC")
+}
 
-	if data.UseOIDC.IsNull() {
-		if v := os.Getenv("ARM_USE_OIDC"); v != "" {
-			data.UseOIDC = types.BoolValue(v == "true")
-		} else {
-			data.UseOIDC = types.BoolValue(false)
-		}
+func tryWriteEnvironmentVariable(name string, value types.String) {
+	if v := value.ValueString(); v != "" {
+		_ = os.Setenv(name, v)
 	}
 }
 
 func writeDefaultAzureCredentialEnvironmentVariables(data *MsGraphProviderData) {
-	if v := data.TenantID.ValueString(); v != "" {
-		_ = os.Setenv("AZURE_TENANT_ID", v)
-	}
-	if v := data.ClientID.ValueString(); v != "" {
-		_ = os.Setenv("AZURE_CLIENT_ID", v)
-	}
+	tryWriteEnvironmentVariable("AZURE_TENANT_ID", data.TenantID)
+	tryWriteEnvironmentVariable("AZURE_CLIENT_ID", data.ClientID)
 }
 
 func (p *MsGraphProvider) Resources(ctx context.Context) []func() resource.Resource {
