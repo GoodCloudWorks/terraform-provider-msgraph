@@ -25,6 +25,10 @@ data "msgraph_object" "me" {
 
 - `id` (String) The ID of the object to retrieve.
 
+### Optional
+
+- `api_version` (String) Override the provider Microsoft Graph API version.
+
 ### Read-Only
 
 - `output` (Dynamic) The object retrieved from Microsoft Graph.

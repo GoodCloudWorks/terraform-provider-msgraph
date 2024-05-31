@@ -13,8 +13,9 @@ import (
 )
 
 type MsGraphObjectDataSourceModel struct {
-	ID     types.String  `tfsdk:"id"`
-	Output types.Dynamic `tfsdk:"output"`
+	ID         types.String  `tfsdk:"id"`
+	ApiVersion types.String  `tfsdk:"api_version"`
+	Output     types.Dynamic `tfsdk:"output"`
 }
 
 type MsGraphObjectDataSource struct {
@@ -49,6 +50,11 @@ func (r *MsGraphObjectDataSource) Schema(ctx context.Context, request datasource
 				Description: "The ID of the object to retrieve.",
 			},
 
+			"api_version": schema.StringAttribute{
+				Optional:    true,
+				Description: "Override the provider Microsoft Graph API version.",
+			},
+
 			"output": schema.DynamicAttribute{
 				Computed:    true,
 				Description: "The object retrieved from Microsoft Graph.",
@@ -69,7 +75,13 @@ func (r *MsGraphObjectDataSource) Read(ctx context.Context, request datasource.R
 	client := r.ProviderData
 	id := model.ID.ValueString()
 
-	result, err := client.Get(ctx, id)
+	httpRequest := client.Request(id)
+
+	if !model.ApiVersion.IsNull() {
+		httpRequest = httpRequest.ApiVersion(model.ApiVersion.ValueString())
+	}
+
+	result, err := httpRequest.Get(ctx)
 	if err != nil {
 		response.Diagnostics.AddError(fmt.Sprintf("Failed to get resource with ID %q.", id), err.Error())
 		return

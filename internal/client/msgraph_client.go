@@ -30,7 +30,7 @@ func NewMsGraphClient(options *MsGraphClientOptions) (*MsGraphClient, error) {
 	}
 
 	client := resty.New()
-	client.BaseURL = "https://graph.microsoft.com/" + options.ApiVersion + "/"
+	client.BaseURL = "https://graph.microsoft.com/"
 	client.OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
 		token, err := credential.GetToken(req.Context(), policy.TokenRequestOptions{
 			Scopes: []string{"https://graph.microsoft.com/.default"},
