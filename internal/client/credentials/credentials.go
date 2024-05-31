@@ -46,11 +46,11 @@ func NewTokenCredential(options *CredentialOptions) (azcore.TokenCredential, err
 		credentials = append(credentials, cliCredential)
 	}
 
-	envCredential, err := newEnvironmentCredential()
+	defaultCredential, err := newDefaultCredential(options)
 	if err != nil {
 		return nil, err
 	}
-	credentials = append(credentials, envCredential)
+	credentials = append(credentials, defaultCredential)
 
 	chainedCredentials, err := azidentity.NewChainedTokenCredential(credentials, nil)
 	if err != nil {
@@ -95,7 +95,9 @@ func newCliCredential(options *CredentialOptions) (azcore.TokenCredential, error
 	return azidentity.NewAzureCLICredential(cliOptions)
 }
 
-func newEnvironmentCredential() (azcore.TokenCredential, error) {
-	envOptions := &azidentity.EnvironmentCredentialOptions{}
-	return azidentity.NewEnvironmentCredential(envOptions)
+func newDefaultCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
+	credentialOptions := &azidentity.DefaultAzureCredentialOptions{
+		TenantID: options.TenantID,
+	}
+	return azidentity.NewDefaultAzureCredential(credentialOptions)
 }
