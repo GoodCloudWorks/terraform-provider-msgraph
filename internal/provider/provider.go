@@ -26,7 +26,10 @@ type MsGraphProviderData struct {
 	ClientID   types.String `tfsdk:"client_id"`
 	TenantID   types.String `tfsdk:"tenant_id"`
 
-	UseOIDC           types.Bool   `tfsdk:"use_oidc"`
+	UseOIDC types.Bool `tfsdk:"use_oidc"`
+	UseMSI  types.Bool `tfsdk:"use_msi"`
+	UseCLI  types.Bool `tfsdk:"use_cli"`
+
 	OIDCRequestToken  types.String `tfsdk:"oidc_request_token"`
 	OIDCRequestURL    types.String `tfsdk:"oidc_request_url"`
 	OIDCToken         types.String `tfsdk:"oidc_token"`
@@ -52,12 +55,27 @@ func (p *MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest
 
 			"client_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "The Client ID which should be used.",
+				Description: "The Client ID used for authentication.",
 			},
 
 			"tenant_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "The Tenant ID which should be used.",
+				Description: "The Tenant ID to authenticate against.",
+			},
+
+			"use_oidc": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Attempt to use OpenID Connect Federated authentication.",
+			},
+
+			"use_msi": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Attempt to use Managed Service Identity authentication.",
+			},
+
+			"use_cli": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Attempt to use Azure CLI for authentication.",
 			},
 
 			"oidc_request_token": schema.StringAttribute{
@@ -79,11 +97,6 @@ func (p *MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest
 				Optional:    true,
 				Description: "The path to a file containing an OIDC ID token for use when authenticating as a Service Principal using OpenID Connect.",
 			},
-
-			"use_oidc": schema.BoolAttribute{
-				Optional:    true,
-				Description: "Allow OpenID Connect to be used for authentication",
-			},
 		},
 	}
 }
@@ -104,7 +117,10 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 		TenantID: data.TenantID.ValueString(),
 		ClientID: data.ClientID.ValueString(),
 
-		UseOIDC:           data.UseOIDC.ValueBool(),
+		UseOIDC: data.UseOIDC.ValueBool(),
+		UseMSI:  data.UseMSI.ValueBool(),
+		UseCLI:  data.UseCLI.ValueBool(),
+
 		OIDCRequestToken:  data.OIDCRequestToken.ValueString(),
 		OIDCRequestURL:    data.OIDCRequestURL.ValueString(),
 		OIDCToken:         data.OIDCToken.ValueString(),
@@ -124,6 +140,36 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+func readProviderData(data *MsGraphProviderData) {
+	data.ApiVersion = readStringFromEnvironment(data.ApiVersion, "MSGRAPH_API_VERSION")
+	if data.ApiVersion.IsNull() {
+		data.ApiVersion = types.StringValue("v1.0")
+	}
+
+	data.ClientID = readStringFromEnvironment(data.ClientID, "ARM_CLIENT_ID")
+	data.TenantID = readStringFromEnvironment(data.TenantID, "ARM_TENANT_ID")
+
+	// OIDC
+	data.UseOIDC = readBoolFromEnvironment(data.UseOIDC, "ARM_USE_OIDC")
+	data.OIDCRequestToken = readStringFromEnvironment(data.OIDCRequestToken, "ARM_OIDC_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+	data.OIDCRequestURL = readStringFromEnvironment(data.OIDCRequestURL, "ARM_OIDC_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_URL")
+	data.OIDCToken = readStringFromEnvironment(data.OIDCToken, "ARM_OIDC_TOKEN")
+	data.OIDCTokenFilePath = readStringFromEnvironment(data.OIDCTokenFilePath, "ARM_OIDC_TOKEN_FILE_PATH")
+
+	// MSI
+	data.UseMSI = readBoolFromEnvironment(data.UseMSI, "ARM_USE_MSI")
+
+	// CLI
+	data.UseCLI = defaultIsTrue(readBoolFromEnvironment(data.UseCLI, "ARM_USE_CLI"))
+}
+
+func defaultIsTrue(data types.Bool) types.Bool {
+	if data.IsNull() {
+		return types.BoolValue(true)
+	}
+	return data
 }
 
 func readStringFromEnvironment(data types.String, names ...string) types.String {
@@ -148,23 +194,6 @@ func readBoolFromEnvironment(data types.Bool, names ...string) types.Bool {
 	}
 
 	return data
-}
-
-func readProviderData(data *MsGraphProviderData) {
-	data.ApiVersion = readStringFromEnvironment(data.ApiVersion, "MSGRAPH_API_VERSION")
-	if data.ApiVersion.IsNull() {
-		data.ApiVersion = types.StringValue("v1.0")
-	}
-
-	data.ClientID = readStringFromEnvironment(data.ClientID, "ARM_CLIENT_ID")
-	data.TenantID = readStringFromEnvironment(data.TenantID, "ARM_TENANT_ID")
-
-	// OIDC
-	data.OIDCRequestToken = readStringFromEnvironment(data.OIDCRequestToken, "ARM_OIDC_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
-	data.OIDCRequestURL = readStringFromEnvironment(data.OIDCRequestURL, "ARM_OIDC_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_URL")
-	data.OIDCToken = readStringFromEnvironment(data.OIDCToken, "ARM_OIDC_TOKEN")
-	data.OIDCTokenFilePath = readStringFromEnvironment(data.OIDCTokenFilePath, "ARM_OIDC_TOKEN_FILE_PATH")
-	data.UseOIDC = readBoolFromEnvironment(data.UseOIDC, "ARM_USE_OIDC")
 }
 
 func tryWriteEnvironmentVariable(name string, value types.String) {

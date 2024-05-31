@@ -9,7 +9,10 @@ type CredentialOptions struct {
 	TenantID string
 	ClientID string
 
-	UseOIDC           bool
+	UseMSI  bool
+	UseCLI  bool
+	UseOIDC bool
+
 	OIDCRequestToken  string
 	OIDCRequestURL    string
 	OIDCToken         string
@@ -19,10 +22,6 @@ type CredentialOptions struct {
 func NewTokenCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
 	var credentials []azcore.TokenCredential
 
-	credentialOptions := &azidentity.DefaultAzureCredentialOptions{
-		TenantID: options.TenantID,
-	}
-
 	if options.UseOIDC {
 		oidcCredential, err := newOidcCredential(options)
 		if err != nil {
@@ -31,11 +30,27 @@ func NewTokenCredential(options *CredentialOptions) (azcore.TokenCredential, err
 		credentials = append(credentials, oidcCredential)
 	}
 
-	defaultCredential, err := azidentity.NewDefaultAzureCredential(credentialOptions)
+	if options.UseMSI {
+		msiCredential, err := newMsiCredential(options)
+		if err != nil {
+			return nil, err
+		}
+		credentials = append(credentials, msiCredential)
+	}
+
+	if options.UseCLI {
+		cliCredential, err := newCliCredential(options)
+		if err != nil {
+			return nil, err
+		}
+		credentials = append(credentials, cliCredential)
+	}
+
+	envCredential, err := newEnvironmentCredential()
 	if err != nil {
 		return nil, err
 	}
-	credentials = append(credentials, defaultCredential)
+	credentials = append(credentials, envCredential)
 
 	chainedCredentials, err := azidentity.NewChainedTokenCredential(credentials, nil)
 	if err != nil {
@@ -60,4 +75,27 @@ func newOidcCredential(options *CredentialOptions) (azcore.TokenCredential, erro
 		return nil, err
 	}
 	return credential, nil
+}
+
+func newMsiCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
+	msiOptions := &azidentity.ManagedIdentityCredentialOptions{}
+
+	if options.ClientID != "" {
+		msiOptions.ID = azidentity.ClientID(options.ClientID)
+	}
+
+	return azidentity.NewManagedIdentityCredential(msiOptions)
+
+}
+
+func newCliCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
+	cliOptions := &azidentity.AzureCLICredentialOptions{
+		TenantID: options.TenantID,
+	}
+	return azidentity.NewAzureCLICredential(cliOptions)
+}
+
+func newEnvironmentCredential() (azcore.TokenCredential, error) {
+	envOptions := &azidentity.EnvironmentCredentialOptions{}
+	return azidentity.NewEnvironmentCredential(envOptions)
 }
