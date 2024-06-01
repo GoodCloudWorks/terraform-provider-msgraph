@@ -11,5 +11,5 @@ const testProviderConfig = `
 	`
 
 var testProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"msgraph": providerserver.NewProtocol6WithError(New("test")()),
+	"msgraph": providerserver.NewProtocol6WithError(&MsGraphProvider{}),
 }

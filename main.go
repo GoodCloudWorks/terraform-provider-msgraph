@@ -8,37 +8,29 @@ import (
 	"flag"
 	"log"
 
-	"terraform-provider-msgraph/internal/provider"
+	internal_provider "terraform-provider-msgraph/internal/provider"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	terraform_provider "github.com/hashicorp/terraform-plugin-framework/provider"
+
+	terraform_provider_server "github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
-// Run "go generate" to format example terraform files and generate the docs for the registry/website
-
-// If you do not have terraform installed, you can remove the formatting command, but its suggested to
-// ensure the documentation is formatted properly.
 //go:generate terraform fmt -recursive ./examples/
-
-// Run the docs generation tool, check its repository for more information on how it works and how docs
-// can be customized.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate -provider-name msgraph
-
-var (
-	version string = "dev"
-)
-
 func main() {
 	var debug bool
 
 	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
 	flag.Parse()
 
-	opts := providerserver.ServeOpts{
+	opts := terraform_provider_server.ServeOpts{
 		Address: "registry.terraform.io/goodcloudworks/msgraph",
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	err := terraform_provider_server.Serve(context.Background(), func() terraform_provider.Provider {
+		return &internal_provider.MsGraphProvider{}
+	}, opts)
 
 	if err != nil {
 		log.Fatal(err.Error())

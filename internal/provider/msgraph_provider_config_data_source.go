@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"terraform-provider-msgraph/internal/client"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -17,7 +16,7 @@ type MsGraphProviderConfigDataSourceModel struct {
 }
 
 type MsGraphProviderConfigDataSource struct {
-	ProviderData *client.MsGraphClient
+	Client MsGraphClient
 }
 
 var (
@@ -30,8 +29,8 @@ func NewMsGraphProviderConfigDataSource() datasource.DataSource {
 }
 
 func (r *MsGraphProviderConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if v, ok := request.ProviderData.(*client.MsGraphClient); ok {
-		r.ProviderData = v
+	if v, ok := request.ProviderData.(MsGraphClient); ok {
+		r.Client = v
 	}
 }
 
@@ -70,9 +69,9 @@ func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request data
 		return
 	}
 
-	client := r.ProviderData
+	client := r.Client
 
-	accessToken, err := client.GetAccessToken(ctx)
+	accessToken, err := client.GetToken(ctx)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to get access token.", err.Error())
 		return
@@ -90,13 +89,11 @@ func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request data
 
 	oid := claims["oid"].(string)
 	tid := claims["tid"].(string)
+	clientID := claims["appid"].(string)
 
 	model.TenantID = types.StringValue(tid)
 	model.ObjectID = types.StringValue(oid)
-
-	if client.Options.Credentials.ClientID != "" {
-		model.ClientID = types.StringValue(client.Options.Credentials.ClientID)
-	}
+	model.ClientID = types.StringValue(clientID)
 
 	response.Diagnostics.Append(response.State.Set(ctx, &model)...)
 }

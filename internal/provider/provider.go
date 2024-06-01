@@ -2,9 +2,6 @@ package provider
 
 import (
 	"context"
-	"os"
-	"terraform-provider-msgraph/internal/client"
-	"terraform-provider-msgraph/internal/client/credentials"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -18,30 +15,13 @@ import (
 var _ provider.Provider = &MsGraphProvider{}
 
 type MsGraphProvider struct {
-	version string
 }
 
-type MsGraphProviderData struct {
-	ApiVersion types.String `tfsdk:"api_version"`
-	ClientID   types.String `tfsdk:"client_id"`
-	TenantID   types.String `tfsdk:"tenant_id"`
-
-	UseOIDC types.Bool `tfsdk:"use_oidc"`
-	UseMSI  types.Bool `tfsdk:"use_msi"`
-	UseCLI  types.Bool `tfsdk:"use_cli"`
-
-	OIDCRequestToken  types.String `tfsdk:"oidc_request_token"`
-	OIDCRequestURL    types.String `tfsdk:"oidc_request_url"`
-	OIDCToken         types.String `tfsdk:"oidc_token"`
-	OIDCTokenFilePath types.String `tfsdk:"oidc_token_file_path"`
-}
-
-func (p *MsGraphProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (*MsGraphProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "msgraph"
-	resp.Version = p.version
 }
 
-func (p *MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (*MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "The provider allows you to interact with Microsoft Graph.",
 		Attributes: map[string]schema.Attribute{
@@ -51,6 +31,12 @@ func (p *MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest
 				Validators: []validator.String{
 					stringvalidator.OneOf("v1.0", "beta"),
 				},
+			},
+
+			"scopes": schema.SetAttribute{
+				Description: "The scopes to request when authenticating.",
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 
 			"client_id": schema.StringAttribute{
@@ -101,40 +87,22 @@ func (p *MsGraphProvider) Schema(ctx context.Context, req provider.SchemaRequest
 	}
 }
 
-func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+func (*MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var data MsGraphProviderData
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	readProviderData(&data)
-	writeDefaultAzureCredentialEnvironmentVariables(&data)
-
-	credentialOptions := &credentials.CredentialOptions{
-		TenantID: data.TenantID.ValueString(),
-		ClientID: data.ClientID.ValueString(),
-
-		UseOIDC: data.UseOIDC.ValueBool(),
-		UseMSI:  data.UseMSI.ValueBool(),
-		UseCLI:  data.UseCLI.ValueBool(),
-
-		OIDCRequestToken:  data.OIDCRequestToken.ValueString(),
-		OIDCRequestURL:    data.OIDCRequestURL.ValueString(),
-		OIDCToken:         data.OIDCToken.ValueString(),
-		OIDCTokenFilePath: data.OIDCTokenFilePath.ValueString(),
+	resp.Diagnostics.Append(data.Configure()...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	options := &client.MsGraphClientOptions{
-		ApiVersion:  data.ApiVersion.ValueString(),
-		Credentials: credentialOptions,
-	}
-
-	client, err := client.NewMsGraphClient(options)
+	client, err := data.NewClient()
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to obtain a msgraph client.", err.Error())
+		resp.Diagnostics.AddError("Failed to obtain a client.", err.Error())
 		return
 	}
 
@@ -142,86 +110,13 @@ func (p *MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureR
 	resp.ResourceData = client
 }
 
-func readProviderData(data *MsGraphProviderData) {
-	data.ApiVersion = readStringFromEnvironment(data.ApiVersion, "MSGRAPH_API_VERSION")
-	if data.ApiVersion.IsNull() {
-		data.ApiVersion = types.StringValue("v1.0")
-	}
-
-	data.ClientID = readStringFromEnvironment(data.ClientID, "ARM_CLIENT_ID")
-	data.TenantID = readStringFromEnvironment(data.TenantID, "ARM_TENANT_ID")
-
-	// OIDC
-	data.UseOIDC = readBoolFromEnvironment(data.UseOIDC, "ARM_USE_OIDC")
-	data.OIDCRequestToken = readStringFromEnvironment(data.OIDCRequestToken, "ARM_OIDC_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
-	data.OIDCRequestURL = readStringFromEnvironment(data.OIDCRequestURL, "ARM_OIDC_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_URL")
-	data.OIDCToken = readStringFromEnvironment(data.OIDCToken, "ARM_OIDC_TOKEN")
-	data.OIDCTokenFilePath = readStringFromEnvironment(data.OIDCTokenFilePath, "ARM_OIDC_TOKEN_FILE_PATH")
-
-	// MSI
-	data.UseMSI = readBoolFromEnvironment(data.UseMSI, "ARM_USE_MSI")
-
-	// CLI
-	data.UseCLI = defaultIsTrue(readBoolFromEnvironment(data.UseCLI, "ARM_USE_CLI"))
-}
-
-func defaultIsTrue(data types.Bool) types.Bool {
-	if data.IsNull() {
-		return types.BoolValue(true)
-	}
-	return data
-}
-
-func readStringFromEnvironment(data types.String, names ...string) types.String {
-	if data.IsNull() {
-		for _, name := range names {
-			if value := os.Getenv(name); value != "" {
-				return types.StringValue(value)
-			}
-		}
-	}
-	return data
-}
-
-func readBoolFromEnvironment(data types.Bool, names ...string) types.Bool {
-	if data.IsNull() {
-		for _, name := range names {
-			if value := os.Getenv(name); value != "" {
-				return types.BoolValue(value == "true")
-			}
-		}
-		return types.BoolValue(false)
-	}
-
-	return data
-}
-
-func tryWriteEnvironmentVariable(name string, value types.String) {
-	if v := value.ValueString(); v != "" {
-		_ = os.Setenv(name, v)
-	}
-}
-
-func writeDefaultAzureCredentialEnvironmentVariables(data *MsGraphProviderData) {
-	tryWriteEnvironmentVariable("AZURE_TENANT_ID", data.TenantID)
-	tryWriteEnvironmentVariable("AZURE_CLIENT_ID", data.ClientID)
-}
-
-func (p *MsGraphProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (*MsGraphProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{}
 }
 
-func (p *MsGraphProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (*MsGraphProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewMsGraphProviderConfigDataSource,
 		NewMsGraphObjectDataSource,
-	}
-}
-
-func New(version string) func() provider.Provider {
-	return func() provider.Provider {
-		return &MsGraphProvider{
-			version: version,
-		}
 	}
 }

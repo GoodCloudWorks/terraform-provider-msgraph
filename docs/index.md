@@ -29,6 +29,7 @@ provider "msgraph" {
 - `oidc_request_url` (String) The URL for the OIDC provider from which to request an ID token. For use When authenticating as a Service Principal using OpenID Connect.
 - `oidc_token` (String) The OIDC ID token for use when authenticating as a Service Principal using OpenID Connect.
 - `oidc_token_file_path` (String) The path to a file containing an OIDC ID token for use when authenticating as a Service Principal using OpenID Connect.
+- `scopes` (Set of String) The scopes to request when authenticating.
 - `tenant_id` (String) The Tenant ID to authenticate against.
 - `use_cli` (Boolean) Attempt to use Azure CLI for authentication.
 - `use_msi` (Boolean) Attempt to use Managed Service Identity authentication.

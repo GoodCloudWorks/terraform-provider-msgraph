@@ -2,9 +2,7 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"terraform-provider-msgraph/internal/client"
 	"terraform-provider-msgraph/internal/dynamic"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -19,7 +17,7 @@ type MsGraphObjectDataSourceModel struct {
 }
 
 type MsGraphObjectDataSource struct {
-	ProviderData *client.MsGraphClient
+	Client MsGraphClient
 }
 
 var (
@@ -32,8 +30,8 @@ func NewMsGraphObjectDataSource() datasource.DataSource {
 }
 
 func (r *MsGraphObjectDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if v, ok := request.ProviderData.(*client.MsGraphClient); ok {
-		r.ProviderData = v
+	if v, ok := request.ProviderData.(MsGraphClient); ok {
+		r.Client = v
 	}
 }
 
@@ -72,30 +70,24 @@ func (r *MsGraphObjectDataSource) Read(ctx context.Context, request datasource.R
 		return
 	}
 
-	client := r.ProviderData
-	id := model.ID.ValueString()
+	client := r.Client
+	http := client.R(ctx, model.ApiVersion)
+	path := client.URL(model.ID)
 
-	httpRequest := client.Request(id)
-
-	if !model.ApiVersion.IsNull() {
-		httpRequest = httpRequest.ApiVersion(model.ApiVersion.ValueString())
-	}
-
-	result, err := httpRequest.Get(ctx)
+	result, err := http.Get(path)
 	if err != nil {
-		response.Diagnostics.AddError(fmt.Sprintf("Failed to get resource with ID %q.", id), err.Error())
+		response.Diagnostics.AddError(fmt.Sprintf("Failed to get resource with ID %q.", path), err.Error())
 		return
 	}
 
-	jsonStr, err := json.Marshal(result)
-	if err != nil {
-		response.Diagnostics.AddError(fmt.Sprintf("Failed to marshal resource with ID %q.", id), err.Error())
+	if result.IsError() {
+		response.Diagnostics.AddError(fmt.Sprintf("Failed (%d) to get resource with ID %q.", result.StatusCode(), path), string(result.Body()))
 		return
 	}
 
-	output, err := dynamic.FromJSONImplied(jsonStr)
+	output, err := dynamic.FromJSONImplied(result.Body())
 	if err != nil {
-		response.Diagnostics.AddError(fmt.Sprintf("Failed to unmarshal resource with ID %q.", id), err.Error())
+		response.Diagnostics.AddError(fmt.Sprintf("Failed to read resource %q response.", path), err.Error())
 		return
 	}
 
