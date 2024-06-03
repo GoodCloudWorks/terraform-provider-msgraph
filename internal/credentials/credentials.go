@@ -19,7 +19,7 @@ type CredentialOptions struct {
 	OIDCTokenFilePath string
 }
 
-func NewTokenCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
+func NewCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
 	var credentials []azcore.TokenCredential
 
 	if options.UseOIDC {
@@ -58,23 +58,6 @@ func NewTokenCredential(options *CredentialOptions) (azcore.TokenCredential, err
 	}
 
 	return chainedCredentials, nil
-}
-
-func newOidcCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
-	oidcOptions := &OidcCredentialOptions{
-		ClientID: options.ClientID,
-		TenantID: options.TenantID,
-
-		RequestToken:  options.OIDCRequestToken,
-		RequestUrl:    options.OIDCRequestURL,
-		Token:         options.OIDCToken,
-		TokenFilePath: options.OIDCTokenFilePath,
-	}
-	credential, err := NewOidcCredential(oidcOptions)
-	if err != nil {
-		return nil, err
-	}
-	return credential, nil
 }
 
 func newMsiCredential(options *CredentialOptions) (azcore.TokenCredential, error) {

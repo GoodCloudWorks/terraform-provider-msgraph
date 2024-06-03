@@ -15,6 +15,15 @@ import (
 var _ provider.Provider = &MsGraphProvider{}
 
 type MsGraphProvider struct {
+	dataSources []func() datasource.DataSource
+	resources   []func() resource.Resource
+}
+
+func New(dataSources []func() datasource.DataSource, resources []func() resource.Resource) provider.Provider {
+	return &MsGraphProvider{
+		dataSources: dataSources,
+		resources:   resources,
+	}
 }
 
 func (*MsGraphProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -110,13 +119,10 @@ func (*MsGraphProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	resp.ResourceData = client
 }
 
-func (*MsGraphProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+func (provider *MsGraphProvider) Resources(ctx context.Context) []func() resource.Resource {
+	return provider.resources
 }
 
-func (*MsGraphProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		NewMsGraphProviderConfigDataSource,
-		NewMsGraphObjectDataSource,
-	}
+func (provider *MsGraphProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return provider.dataSources
 }

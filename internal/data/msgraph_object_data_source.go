@@ -1,9 +1,11 @@
-package provider
+package data
 
 import (
 	"context"
 	"fmt"
-	"terraform-provider-msgraph/internal/dynamic"
+
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/client"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/dynamic"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -17,7 +19,7 @@ type MsGraphObjectDataSourceModel struct {
 }
 
 type MsGraphObjectDataSource struct {
-	Client MsGraphClient
+	Client client.MsGraphClient
 }
 
 var (
@@ -30,7 +32,7 @@ func NewMsGraphObjectDataSource() datasource.DataSource {
 }
 
 func (r *MsGraphObjectDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if v, ok := request.ProviderData.(MsGraphClient); ok {
+	if v, ok := request.ProviderData.(client.MsGraphClient); ok {
 		r.Client = v
 	}
 }

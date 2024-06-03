@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"terraform-provider-msgraph/internal/credentials"
+
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/client"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/credentials"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -11,21 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type MsGraphClient interface {
-	GetToken(context context.Context) (string, error)
-	R(context context.Context, apiVersion types.String) *resty.Request
-	URL(id types.String) string
-}
-
-type MsGraphProviderClient struct {
+type msGraphProviderClient struct {
 	scopes     []string
 	resty      *resty.Client
 	credential azcore.TokenCredential
 }
 
-var _ MsGraphClient = &MsGraphProviderClient{}
+var _ client.MsGraphClient = &msGraphProviderClient{}
 
-func (client *MsGraphProviderClient) GetToken(context context.Context) (string, error) {
+func (client *msGraphProviderClient) GetToken(context context.Context) (string, error) {
 	token, err := client.credential.GetToken(context, policy.TokenRequestOptions{
 		Scopes: client.scopes,
 	})
@@ -35,7 +31,7 @@ func (client *MsGraphProviderClient) GetToken(context context.Context) (string, 
 	return token.Token, nil
 }
 
-func (client *MsGraphProviderClient) R(context context.Context, apiVersion types.String) *resty.Request {
+func (client *msGraphProviderClient) R(context context.Context, apiVersion types.String) *resty.Request {
 	request := client.resty.R().SetContext(context)
 	if !apiVersion.IsNull() {
 		request.SetPathParam("api_version", apiVersion.ValueString())
@@ -43,11 +39,11 @@ func (client *MsGraphProviderClient) R(context context.Context, apiVersion types
 	return request
 }
 
-func (*MsGraphProviderClient) URL(id types.String) string {
+func (*msGraphProviderClient) URL(id types.String) string {
 	return fmt.Sprintf("{api_version}/%s", id.ValueString())
 }
 
-func (data *MsGraphProviderData) NewClient() (*MsGraphProviderClient, error) {
+func (data *MsGraphProviderData) NewClient() (*msGraphProviderClient, error) {
 	credentialOptions := &credentials.CredentialOptions{
 		TenantID: data.TenantID.ValueString(),
 		ClientID: data.ClientID.ValueString(),
@@ -62,7 +58,7 @@ func (data *MsGraphProviderData) NewClient() (*MsGraphProviderClient, error) {
 		OIDCTokenFilePath: data.OIDCTokenFilePath.ValueString(),
 	}
 
-	credential, err := credentials.NewTokenCredential(credentialOptions)
+	credential, err := credentials.NewCredential(credentialOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +82,7 @@ func (data *MsGraphProviderData) NewClient() (*MsGraphProviderClient, error) {
 		return nil
 	})
 
-	providerClient := &MsGraphProviderClient{
+	providerClient := &msGraphProviderClient{
 		scopes:     scopes,
 		resty:      client,
 		credential: credential,

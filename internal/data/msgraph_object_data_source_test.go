@@ -1,34 +1,35 @@
-package provider
+package data
 
 import (
 	"testing"
 
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/acceptance"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccMsGraphObjectDataSource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testProviderFactories,
+		ProtoV6ProviderFactories: protoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testProviderConfig + `
+				Config: acceptance.Config(`
 					data "msgraph_provider_config" "this" {}
 					data "msgraph_object" "organization" {
 						id = "organization/${data.msgraph_provider_config.this.tenant_id}" 
 					}
-					`,
+					`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.msgraph_object.organization", "output.@odata.context", "https://graph.microsoft.com/v1.0/$metadata#organization/$entity"),
 				),
 			},
 			{
-				Config: testProviderConfig + `
+				Config: acceptance.Config(`
 					data "msgraph_provider_config" "this" {}
 					data "msgraph_object" "organization" {
 						id          = "organization/${data.msgraph_provider_config.this.tenant_id}" 
 						api_version = "beta"
 					}
-					`,
+					`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.msgraph_object.organization", "output.@odata.context", "https://graph.microsoft.com/beta/$metadata#organization/$entity"),
 				),

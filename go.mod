@@ -1,4 +1,4 @@
-module terraform-provider-msgraph
+module github.com/GoodCloudWorks/terraform-provider-msgraph
 
 go 1.22.2
 

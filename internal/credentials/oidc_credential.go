@@ -2,124 +2,94 @@ package credentials
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/go-resty/resty/v2"
 )
 
-type OidcCredential struct {
+type oidcCredential struct {
 	requestToken  string
 	requestUrl    string
 	token         string
 	tokenFilePath string
-	cred          *azidentity.ClientAssertionCredential
+	resty         *resty.Client
 }
 
-type OidcCredentialOptions struct {
-	azcore.ClientOptions
-	TenantID                   string
-	ClientID                   string
-	RequestToken               string
-	RequestUrl                 string
-	Token                      string
-	TokenFilePath              string
-	AdditionallyAllowedTenants []string
-}
-
-var _ azcore.TokenCredential = &OidcCredential{}
-
-func NewOidcCredential(options *OidcCredentialOptions) (*OidcCredential, error) {
-	w := &OidcCredential{
-		requestToken:  options.RequestToken,
-		requestUrl:    options.RequestUrl,
-		token:         options.Token,
-		tokenFilePath: options.TokenFilePath,
+func newOidcCredential(options *CredentialOptions) (azcore.TokenCredential, error) {
+	oidcCredential := &oidcCredential{
+		requestToken:  options.OIDCRequestToken,
+		requestUrl:    options.OIDCRequestURL,
+		token:         options.OIDCToken,
+		tokenFilePath: options.OIDCTokenFilePath,
+		resty:         resty.New(),
 	}
 
-	cred, err := azidentity.NewClientAssertionCredential(options.TenantID, options.ClientID, w.getAssertion,
-		&azidentity.ClientAssertionCredentialOptions{
-			AdditionallyAllowedTenants: options.AdditionallyAllowedTenants,
-			ClientOptions:              options.ClientOptions,
-		})
+	credential, err := azidentity.NewClientAssertionCredential(
+		options.TenantID,
+		options.ClientID,
+		oidcCredential.getAssertion,
+		&azidentity.ClientAssertionCredentialOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	w.cred = cred
-	return w, nil
+	return credential, nil
 }
 
-func (w *OidcCredential) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
-	return w.cred.GetToken(ctx, opts)
-}
-
-func (w *OidcCredential) getAssertion(ctx context.Context) (string, error) {
-	if w.token != "" {
-		return w.token, nil
+func (credential *oidcCredential) getAssertion(ctx context.Context) (string, error) {
+	if credential.token != "" {
+		return credential.token, nil
 	}
 
-	if w.tokenFilePath != "" {
-		idTokenData, err := os.ReadFile(w.tokenFilePath)
+	if credential.tokenFilePath != "" {
+		idTokenData, err := os.ReadFile(credential.tokenFilePath)
 		if err != nil {
-			return "", fmt.Errorf("reading token file: %v", err)
+			return "", fmt.Errorf("getAssertion: reading token file: %v", err)
 		}
 
 		return string(idTokenData), nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.requestUrl, http.NoBody)
-	if err != nil {
-		return "", fmt.Errorf("getAssertion: failed to build request")
+	var tokenResponse struct {
+		Count *int    `json:"count"`
+		Value *string `json:"value"`
 	}
 
-	query, err := url.ParseQuery(req.URL.RawQuery)
+	url, err := url.Parse(credential.requestUrl)
 	if err != nil {
-		return "", fmt.Errorf("getAssertion: cannot parse URL query")
+		return "", fmt.Errorf("getAssertion: cannot parse URL: %s", err)
 	}
 
-	if query.Get("audience") == "" {
+	if url.Query().Get("audience") == "" {
+		query := url.Query()
 		query.Set("audience", "api://AzureADTokenExchange")
-		req.URL.RawQuery = query.Encode()
+		url.RawQuery = query.Encode()
 	}
 
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", w.requestToken))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
+	response, err := credential.resty.R().
+		SetContext(ctx).
+		SetAuthScheme("Bearer").
+		SetAuthToken(credential.requestToken).
+		SetHeader("Accept", "application/json").
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetResult(&tokenResponse).
+		Get(url.String())
 	if err != nil {
 		return "", fmt.Errorf("getAssertion: cannot request token: %v", err)
 	}
 
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return "", fmt.Errorf("getAssertion: cannot parse response: %v", err)
+	if c := response.StatusCode(); c < 200 || c > 299 {
+		return "", fmt.Errorf("getAssertion: received HTTP status %d with response: %s", c, string(response.Body()))
 	}
 
-	if c := resp.StatusCode; c < 200 || c > 299 {
-		return "", fmt.Errorf("getAssertion: received HTTP status %d with response: %s", resp.StatusCode, body)
-	}
-
-	var tokenRes struct {
-		Count *int    `json:"count"`
-		Value *string `json:"value"`
-	}
-	if err := json.Unmarshal(body, &tokenRes); err != nil {
-		return "", fmt.Errorf("getAssertion: cannot unmarshal response: %v", err)
-	}
-
-	if tokenRes.Value == nil {
+	if tokenResponse.Value == nil {
 		return "", fmt.Errorf("getAssertion: nil JWT assertion received from OIDC provider")
 	}
 
-	return *tokenRes.Value, nil
+	return *tokenResponse.Value, nil
 }

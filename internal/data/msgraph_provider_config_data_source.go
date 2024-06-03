@@ -1,7 +1,9 @@
-package provider
+package data
 
 import (
 	"context"
+
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/client"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -16,7 +18,7 @@ type MsGraphProviderConfigDataSourceModel struct {
 }
 
 type MsGraphProviderConfigDataSource struct {
-	Client MsGraphClient
+	Client client.MsGraphClient
 }
 
 var (
@@ -29,7 +31,7 @@ func NewMsGraphProviderConfigDataSource() datasource.DataSource {
 }
 
 func (r *MsGraphProviderConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if v, ok := request.ProviderData.(MsGraphClient); ok {
+	if v, ok := request.ProviderData.(client.MsGraphClient); ok {
 		r.Client = v
 	}
 }

@@ -8,11 +8,13 @@ import (
 	"flag"
 	"log"
 
-	internal_provider "terraform-provider-msgraph/internal/provider"
+	msgraph "github.com/GoodCloudWorks/terraform-provider-msgraph/internal/provider"
 
-	terraform_provider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/data"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/resources"
 
-	terraform_provider_server "github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 //go:generate terraform fmt -recursive ./examples/
@@ -23,13 +25,13 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
 	flag.Parse()
 
-	opts := terraform_provider_server.ServeOpts{
+	opts := providerserver.ServeOpts{
 		Address: "registry.terraform.io/goodcloudworks/msgraph",
 		Debug:   debug,
 	}
 
-	err := terraform_provider_server.Serve(context.Background(), func() terraform_provider.Provider {
-		return &internal_provider.MsGraphProvider{}
+	err := providerserver.Serve(context.Background(), func() provider.Provider {
+		return msgraph.New(data.DataSources(), resources.Resources())
 	}, opts)
 
 	if err != nil {
