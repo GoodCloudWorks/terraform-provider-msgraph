@@ -33,6 +33,14 @@ func TestAccMsGraphObjectResource(t *testing.T) {
 				),
 			},
 			{
+				Config: msGraphGroupResourceConfig(groupName, groupName),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(resourceName, plancheck.ResourceActionNoop),
+					},
+				},
+			},
+			{
 				Config: msGraphGroupResourceConfig(updatedGroupName, groupName),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
