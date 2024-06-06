@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func Apply(source, target types.Dynamic) (types.Dynamic, error) {
+func UpdateWithSchemaPreservation(source, target types.Dynamic) (types.Dynamic, error) {
 	if source.IsNull() || target.IsNull() {
 		return target, nil
 	}
@@ -31,7 +31,7 @@ func Apply(source, target types.Dynamic) (types.Dynamic, error) {
 		return types.DynamicNull(), err
 	}
 
-	resultObject := applyObjects(sourceObject, targetObject)
+	resultObject := updateObjects(sourceObject, targetObject)
 
 	resultJSON, err := json.Marshal(resultObject)
 	if err != nil {
@@ -41,7 +41,7 @@ func Apply(source, target types.Dynamic) (types.Dynamic, error) {
 	return FromJSONImplied(resultJSON)
 }
 
-func applyObjects(source, target interface{}) interface{} {
+func updateObjects(source, target interface{}) interface{} {
 	switch target := target.(type) {
 	case map[string]interface{}:
 		source, ok := source.(map[string]interface{})
@@ -49,7 +49,7 @@ func applyObjects(source, target interface{}) interface{} {
 			return source
 		}
 
-		return applyMap(source, target)
+		return updateMap(source, target)
 
 	case []interface{}:
 		source, ok := source.([]interface{})
@@ -57,30 +57,30 @@ func applyObjects(source, target interface{}) interface{} {
 			return target
 		}
 
-		return applyArray(source, target)
+		return updateArray(source, target)
 	}
 
 	return target
 }
 
-func applyMap(source, target map[string]interface{}) map[string]interface{} {
+func updateMap(source, target map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	for key := range target {
 		if sourceValue, ok := source[key]; ok {
-			result[key] = applyObjects(sourceValue, target[key])
+			result[key] = updateObjects(sourceValue, target[key])
 		}
 	}
 
 	return result
 }
 
-func applyArray(source, target []interface{}) []interface{} {
+func updateArray(source, target []interface{}) []interface{} {
 	result := make([]interface{}, 0, len(source))
 
 	for i := range target {
 		if i < len(source) {
-			result = append(result, applyObjects(source[i], target[i]))
+			result = append(result, updateObjects(source[i], target[i]))
 		}
 	}
 

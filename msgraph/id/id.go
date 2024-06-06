@@ -9,8 +9,9 @@ import (
 )
 
 type ID struct {
-	value *url.URL
-	Path  string
+	value      *url.URL
+	apiVersion string
+	Path       string
 }
 
 func New(collection string, objectId string) *ID {
@@ -33,9 +34,23 @@ func Parse(value string) (*ID, error) {
 		return nil, err
 	}
 
+	apiVersion := ""
+	if strings.HasPrefix(url.Path, "v1.0/") || strings.HasPrefix(url.Path, "beta/") {
+		apiVersion = url.Path[:4]
+		url, err = url.Parse(url.Path[5:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if url.Path == "" {
+		return nil, fmt.Errorf("invalid id: %s", value)
+	}
+
 	return &ID{
-		value: url,
-		Path:  url.Path,
+		value:      url,
+		apiVersion: apiVersion,
+		Path:       url.Path,
 	}, nil
 }
 
@@ -59,5 +74,5 @@ func (id *ID) ObjectId() string {
 }
 
 func (id *ID) ApiVersion() string {
-	return id.value.Query().Get("api-version")
+	return id.apiVersion
 }

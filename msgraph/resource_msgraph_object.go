@@ -102,13 +102,15 @@ func (r *msGraphObjectResource) Create(ctx context.Context, req resource.CreateR
 
 	http := r.client.R(ctx, model.ApiVersion)
 
-	if diags := ensureRequestSetBodyFromDynamic(http, model.Properties); diags.HasError() {
+	resp.Diagnostics.Append(ensureRequestSetBodyFromDynamic(http, model.Properties)...)
+	if resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
 	}
 
 	response, err := post(http, path)
-	if diags := ensureHttpResponseSucceeded(response, err); diags.HasError() {
+	resp.Diagnostics.Append(ensureHttpResponseSucceeded(response, err)...)
+	if resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
 	}
@@ -155,7 +157,7 @@ func (r *msGraphObjectResource) Read(ctx context.Context, req resource.ReadReque
 	}
 	model.Output = content
 
-	properties, err := dynamic.Apply(content, model.Properties)
+	properties, err := dynamic.UpdateWithSchemaPreservation(content, model.Properties)
 	if err != nil {
 		resp.Diagnostics.Append(errorDiagnostics("Failed to apply dynamic properties.", err.Error())...)
 		return
@@ -181,7 +183,8 @@ func (r *msGraphObjectResource) Update(ctx context.Context, req resource.UpdateR
 
 	http := r.client.R(ctx, model.ApiVersion)
 
-	if diags := ensureRequestSetBodyFromDynamic(http, model.Properties); diags.HasError() {
+	resp.Diagnostics.Append(ensureRequestSetBodyFromDynamic(http, model.Properties)...)
+	if resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
 	}
@@ -223,7 +226,8 @@ func (r *msGraphObjectResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	if diags := ensureHttpResponseSucceeded(response, err); diags.HasError() {
+	resp.Diagnostics.Append(ensureHttpResponseSucceeded(response, err)...)
+	if resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
 	}
