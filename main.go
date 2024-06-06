@@ -8,11 +8,7 @@ import (
 	"flag"
 	"log"
 
-	msgraph "github.com/GoodCloudWorks/terraform-provider-msgraph/internal/provider"
-
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/data"
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/resources"
-
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/msgraph"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
@@ -31,7 +27,7 @@ func main() {
 	}
 
 	err := providerserver.Serve(context.Background(), func() provider.Provider {
-		return msgraph.New(data.DataSources(), resources.Resources())
+		return msgraph.NewProvider()
 	}, opts)
 
 	if err != nil {

@@ -2,13 +2,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/client"
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/credentials"
+	"net/http"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/msgraph/client"
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/msgraph/credentials"
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -39,10 +39,6 @@ func (client *msGraphProviderClient) R(context context.Context, apiVersion types
 	return request
 }
 
-func (*msGraphProviderClient) URL(id types.String) string {
-	return fmt.Sprintf("{api_version}/%s", id.ValueString())
-}
-
 func (data *MsGraphProviderData) NewClient() (*msGraphProviderClient, error) {
 	credentialOptions := &credentials.CredentialOptions{
 		TenantID: data.TenantID.ValueString(),
@@ -71,6 +67,19 @@ func (data *MsGraphProviderData) NewClient() (*msGraphProviderClient, error) {
 	client := resty.New()
 	client.BaseURL = "https://graph.microsoft.com/"
 	client.SetPathParam("api_version", data.ApiVersion.ValueString())
+
+	client.SetRetryCount(30)
+	client.SetRetryWaitTime(1 * time.Second)
+	client.SetRetryMaxWaitTime(30 * time.Second)
+	client.AddRetryCondition(
+		func(r *resty.Response, err error) bool {
+			return r.StatusCode() == http.StatusTooManyRequests ||
+				r.StatusCode() == http.StatusInternalServerError ||
+				r.StatusCode() == http.StatusServiceUnavailable ||
+				r.StatusCode() == http.StatusGatewayTimeout
+		},
+	)
+
 	client.OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
 		token, err := credential.GetToken(req.Context(), policy.TokenRequestOptions{
 			Scopes: scopes,

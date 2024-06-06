@@ -1,29 +1,30 @@
-package data
+package msgraph
 
 import (
 	"testing"
 
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/acceptance"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccMsGraphObjectDataSource(t *testing.T) {
+	const resourceName = "data.msgraph_object.organization"
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: acceptance.Config(`
+				Config: defaultProviderConfigWith(`
 					data "msgraph_provider_config" "this" {}
 					data "msgraph_object" "organization" {
 						id = "organization/${data.msgraph_provider_config.this.tenant_id}" 
 					}
 					`),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.msgraph_object.organization", "output.@odata.context", "https://graph.microsoft.com/v1.0/$metadata#organization/$entity"),
+					resource.TestCheckResourceAttr(resourceName, "output.@odata.context", "https://graph.microsoft.com/v1.0/$metadata#organization/$entity"),
+					resource.TestCheckResourceAttr(resourceName, "collection", "organization"),
 				),
 			},
 			{
-				Config: acceptance.Config(`
+				Config: defaultProviderConfigWith(`
 					data "msgraph_provider_config" "this" {}
 					data "msgraph_object" "organization" {
 						id          = "organization/${data.msgraph_provider_config.this.tenant_id}" 
@@ -31,7 +32,7 @@ func TestAccMsGraphObjectDataSource(t *testing.T) {
 					}
 					`),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.msgraph_object.organization", "output.@odata.context", "https://graph.microsoft.com/beta/$metadata#organization/$entity"),
+					resource.TestCheckResourceAttr(resourceName, "output.@odata.context", "https://graph.microsoft.com/beta/$metadata#organization/$entity"),
 				),
 			},
 		},

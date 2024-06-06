@@ -18,6 +18,16 @@ data "msgraph_object" "organization" {
   id = "organization/${data.msgraph_provider_config.this.tenant_id}" 
 }
 
+resource "msgraph_object" "group" {
+  collection = "groups"
+  properties = {
+    displayName = "terraform-provider-msgraph"
+    mailEnabled = false
+    mailNickname = "terraform-provider-msgraph"
+    securityEnabled = true
+  }
+}
+
 output "provider_config" {
   value = data.msgraph_provider_config.this
 }
@@ -28,4 +38,8 @@ output "me" {
 
 output "organization" {
     value = data.msgraph_object.organization.output
+}
+
+output "group" {
+  value = msgraph_object.group.output
 }

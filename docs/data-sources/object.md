@@ -31,4 +31,5 @@ data "msgraph_object" "me" {
 
 ### Read-Only
 
+- `collection` (String) The collection of the object to retrieve.
 - `output` (Dynamic) The object retrieved from Microsoft Graph.

@@ -1,47 +1,46 @@
-package data
+package msgraph
 
 import (
 	"context"
 
-	"github.com/GoodCloudWorks/terraform-provider-msgraph/internal/client"
-
+	"github.com/GoodCloudWorks/terraform-provider-msgraph/msgraph/client"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type MsGraphProviderConfigDataSourceModel struct {
+var (
+	_ datasource.DataSource              = &msGraphProviderConfigDataSource{}
+	_ datasource.DataSourceWithConfigure = &msGraphProviderConfigDataSource{}
+)
+
+type msGraphProviderConfigDataSource struct {
+	client client.MsGraphClient
+}
+
+type msGraphProviderConfigDataSourceModel struct {
 	TenantID types.String `tfsdk:"tenant_id"`
 	ClientID types.String `tfsdk:"client_id"`
 	ObjectID types.String `tfsdk:"object_id"`
 }
 
-type MsGraphProviderConfigDataSource struct {
-	Client client.MsGraphClient
-}
-
-var (
-	_ datasource.DataSource              = &MsGraphProviderConfigDataSource{}
-	_ datasource.DataSourceWithConfigure = &MsGraphProviderConfigDataSource{}
-)
-
 func NewMsGraphProviderConfigDataSource() datasource.DataSource {
-	return &MsGraphProviderConfigDataSource{}
+	return &msGraphProviderConfigDataSource{}
 }
 
-func (r *MsGraphProviderConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if v, ok := request.ProviderData.(client.MsGraphClient); ok {
-		r.Client = v
+func (r *msGraphProviderConfigDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if v, ok := req.ProviderData.(client.MsGraphClient); ok {
+		r.client = v
 	}
 }
 
-func (r *MsGraphProviderConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
-	response.TypeName = request.ProviderTypeName + "_provider_config"
+func (r *msGraphProviderConfigDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_provider_config"
 }
 
-func (r *MsGraphProviderConfigDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{
+func (r *msGraphProviderConfigDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
 		Description: "This data source provides access to Microsoft Graph objects.",
 		Attributes: map[string]schema.Attribute{
 			"tenant_id": schema.StringAttribute{
@@ -62,20 +61,17 @@ func (r *MsGraphProviderConfigDataSource) Schema(ctx context.Context, request da
 	}
 }
 
-func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var model MsGraphProviderConfigDataSourceModel
+func (r *msGraphProviderConfigDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var model msGraphProviderConfigDataSourceModel
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &model)...)
-
-	if response.Diagnostics.HasError() {
+	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	client := r.Client
-
-	accessToken, err := client.GetToken(ctx)
+	accessToken, err := r.client.GetToken(ctx)
 	if err != nil {
-		response.Diagnostics.AddError("Failed to get access token.", err.Error())
+		resp.Diagnostics.AddError("Failed to get access token.", err.Error())
 		return
 	}
 
@@ -85,7 +81,7 @@ func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request data
 		return nil, nil
 	}, jwt.WithoutClaimsValidation())
 	if claims == nil && err != nil {
-		response.Diagnostics.AddError("Failed to parse access token.", err.Error())
+		resp.Diagnostics.AddError("Failed to parse access token.", err.Error())
 		return
 	}
 
@@ -97,5 +93,5 @@ func (r *MsGraphProviderConfigDataSource) Read(ctx context.Context, request data
 	model.ObjectID = types.StringValue(oid)
 	model.ClientID = types.StringValue(clientID)
 
-	response.Diagnostics.Append(response.State.Set(ctx, &model)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }

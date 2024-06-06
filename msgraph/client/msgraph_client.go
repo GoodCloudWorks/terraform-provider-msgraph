@@ -10,5 +10,4 @@ import (
 type MsGraphClient interface {
 	GetToken(context context.Context) (string, error)
 	R(context context.Context, apiVersion types.String) *resty.Request
-	URL(id types.String) string
 }
